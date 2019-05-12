@@ -22,5 +22,5 @@ This is a good bit of fun, but due to the nature of the constructed cipher text,
 
 ### Decoded
 
-> I have not been in this new world very long, but already I am feeling out of catch. 
-> the blade speaks at me death-fearing. it is unnerving.
+> I have not been in this new world very long, but already I am feeling out of **catch**. 
+> the blade speaks at me **death-fearing**. it is unnerving.
