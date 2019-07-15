@@ -7,6 +7,8 @@ verify_ssl = true
 
 [packages]
 nltk = "*"
+jupyter = "*"
+numpy = "*"
 
 [requires]
 python_version = "3.6"

@@ -1,25 +1,27 @@
 import nltk
 import string
+import numpy as np
 
-from nltk.tag.stanford import StanfordPOSTagger
-_path_to_model = "stanford-postagger-2018-10-16/models/english-bidirectional-distsim.tagger"
-_path_to_jar = "stanford-postagger-2018-10-16/stanford-postagger-3.9.2.jar"
-
+nltk.download('averaged_perceptron_tagger')
 nltk.download('punkt')
 nltk.download('universal_tagset')
 
-#st = StanfordPOSTagger(_path_to_model,_path_to_jar)
+with open('volo.txt') as f:
+    book = f.read()
 
-with open('volo.txt') as corpus:
-	book = corpus.read()
+tokenizer = nltk.tokenize.TweetTokenizer()
 
+def get_line_breaks(text):
+    # uphold line breaks
+	lines = nltk.line_tokenize(text, blanklines='keep')
+	snippets = [len(tokenizer.tokenize(line)) for line in lines[:-1]]
+	breaks = np.array(snippets).cumsum() + np.arange(len(snippets))
+	return breaks
+  
 def tag(text):
 	tagset = 'universal' #'brown'#, 'universal','wsj'
-	pos = nltk.pos_tag(nltk.word_tokenize(text), tagset=tagset)
-	#pos = st.tag(nltk.word_tokenize(text))
+	pos = nltk.pos_tag(tokenizer.tokenize(text), tagset=tagset)
 	return pos
-
-available = tag(book)
 
 def generate_maps(available):
 	pos_maps = {}
@@ -29,35 +31,51 @@ def generate_maps(available):
 		else:
 			pos_maps[word[1]] = [word[0].lower()]
 	pos_maps = {k:list(dict.fromkeys(v)) for k,v in pos_maps.items()}
-	return pos_maps
+	return pos_maps  
 
-pos_maps = generate_maps(available)
+def set_book(book):
+  # strip punc
+  # book = book.translate(str.maketrans('', '', string.punctuation))
+  # just strip "
+  book = book.replace('"','')
+  pos_maps = generate_maps(tag(book))
+  return pos_maps
 
-# TODO: more complicated/customizable transform?
+pos_maps = set_book(book)
+
+
 transform = -1
-
-def untokenize(tokens):
+def untokenize(tokens, linebreaks=[]):
+	for linebreak in linebreaks:
+		tokens.insert(linebreak,'\n')
 	return "".join([" "+i if not i.startswith("'") and i not in string.punctuation \
 		else i for i in tokens]).strip()
 
-def encode(plain_text):
+def encode(plain_text, pos_maps = pos_maps, transform=transform, **kwargs):
+	debug = kwargs.get('debug',0)
 	secret_pos = tag(plain_text)
+	linebreaks = get_line_breaks(plain_text)
 	cipher_text = []
 	for word in secret_pos:
 		try:
 			if word[0] in string.punctuation:
 				cipher_text += [word[0]]
 				continue
-			cipher_list = pos_maps[word[1]]
+			cipher_list = pos_maps.get(word[1])
 			index = cipher_list.index(word[0].lower())
 			new_index = index+transform
 			new_index = new_index % len(cipher_list) if new_index >= len(cipher_list) else new_index
+			if debug or word[0]=='air': 
+				print(word[1],index, cipher_list[index-1:index+2], new_index, cipher_list[new_index-1:new_index+2])
 			cipher_text += [cipher_list[new_index]]
-		except ValueError:
+		except:
+			if debug:
+				print(word[1])
 			cipher_text += [word[0]]
-	return untokenize(cipher_text)
+	return untokenize(cipher_text, linebreaks)
 
-def decode(cipher_text):
+
+def decode(cipher_text, pos_maps = pos_maps, transform=transform, **kwargs):
 	'''
 		Try to reverse the process to recover the origina plaintext.
 		
@@ -66,7 +84,9 @@ def decode(cipher_text):
 
 		Let's call it a fun feature?
 	'''
+	debug = kwargs.get('debug',0)
 	public_pos = tag(cipher_text)
+	linebreaks = get_line_breaks(cipher_text)    
 	plain_text = []
 
 	for word in public_pos:
@@ -78,11 +98,16 @@ def decode(cipher_text):
 			index = cipher_list.index(word[0].lower())
 			new_index = index-transform
 			new_index = new_index % len(cipher_list) if new_index >= len(cipher_list) else new_index
+			if debug or word[0]=='air': 
+				print(word[1],cipher_list[index-2:index+2], cipher_list[new_index-2:new_index+2])            
+
 			plain_text += [cipher_list[new_index]]
 
-		except ValueError:
+		except:
 			# When encoding, this is due to the word missing from the book
 			# But when decoding, this could be due to a change in POS
-			# TODO: 
+			# TODO:             
+			if debug:
+				print(word[1])
 			plain_text += [word[0]]
-	return untokenize(plain_text)
+	return untokenize(plain_text, linebreaks)
